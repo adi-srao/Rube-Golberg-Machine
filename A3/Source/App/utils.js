@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 
 async function MeshFactory(scene, objPath, mtlPath, texturePath, name, vShaderPath, fShaderPath)
 {
@@ -141,8 +142,8 @@ async function MeshFactory(scene, objPath, mtlPath, texturePath, name, vShaderPa
         
         // Extract material properties from MTL file
         const baseColour = (srcMat && srcMat.color) ? srcMat.color.clone() : new THREE.Color(0xffffff);
-        const ambientColor = (srcMat && srcMat.emissive) ? srcMat.emissive.clone() : new THREE.Color(0.2, 0.2, 0.2);
-        const specularColor = (srcMat && srcMat.specular) ? srcMat.specular.clone() : new THREE.Color(1.0, 1.0, 1.0);
+        const ambientColor = new THREE.Color(0.5, 0.5, 0.5); // Brighter ambient light
+        const specularColor = (srcMat && srcMat.specular) ? srcMat.specular.clone() : new THREE.Color(0.3, 0.3, 0.3);
         const emissionColor = (srcMat && srcMat.emissive) ? srcMat.emissive.clone() : new THREE.Color(0.0, 0.0, 0.0);
         const shininess = (srcMat && srcMat.shininess !== undefined) ? srcMat.shininess : 30.0;
         const opacity = (srcMat && srcMat.opacity !== undefined) ? srcMat.opacity : 1.0;
@@ -152,16 +153,19 @@ async function MeshFactory(scene, objPath, mtlPath, texturePath, name, vShaderPa
         if (vShader && fShader) {
             console.log('MeshFactory: creating ShaderMaterial for', child.name);
             
+            // Get texture from material or fallback
+            const baseMap = (srcMat && srcMat.map) ? srcMat.map : texture;
+            
             const uniforms = {
-                u_model: { value: new THREE.Matrix4() },
-                u_viewProjection: { value: new THREE.Matrix4() },
                 u_color: { value: baseColour },
                 u_lightPosition: { value: new THREE.Vector3(0, 2, 2) },
-                u_viewPosition: { value: new THREE.Vector3(0, 0, 5) },
+                u_lightIntensity: { value: 5.0 },
                 u_ambientColor: { value: ambientColor },
                 u_specularColor: { value: specularColor },
                 u_emissionColor: { value: emissionColor },
-                u_shininess: { value: shininess }
+                u_shininess: { value: shininess },
+                u_map: { value: baseMap },
+                u_useMap: { value: baseMap ? 1.0 : 0.0 }
             };
             
             runtimeMat = new THREE.ShaderMaterial({
@@ -216,34 +220,33 @@ light.target.position.set(0, 0, 0);
 scene.add(light);
 camera.position.z = 5;
 
+// Setup TrackballControls
+const controls = new TrackballControls(camera, canvas);
+controls.rotateSpeed = 2.0;
+controls.zoomSpeed = 1.2;
+controls.panSpeed = 0.8;
+controls.staticMoving = true;
+controls.dynamicDampingFactor = 0.3;
+
 function onWindowResize() {
     const width = canvas.clientWidth || canvas.width;
     const height = canvas.clientHeight || canvas.height;
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
+    controls.handleResize();
 }
 window.addEventListener('resize', onWindowResize, false);
 
 function animate() {
     requestAnimationFrame(animate);
     
-    // Update shader uniforms for all meshes with ShaderMaterial
+    // Update controls
+    controls.update();
+    
+    // Only update light position if needed (it's static in your case)
     scene.traverse((obj) => {
         if (obj.isMesh && obj.material.isShaderMaterial) {
-            // Update model matrix
-            obj.updateMatrix();
-            obj.material.uniforms.u_model.value.copy(obj.matrix);
-            
-            // Update view-projection matrix
-            const viewProjection = new THREE.Matrix4();
-            viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-            obj.material.uniforms.u_viewProjection.value.copy(viewProjection);
-            
-            // Update camera position
-            obj.material.uniforms.u_viewPosition.value.copy(camera.position);
-            
-            // Update light position (if you move the light)
             obj.material.uniforms.u_lightPosition.value.set(0, 2, 2);
         }
     });

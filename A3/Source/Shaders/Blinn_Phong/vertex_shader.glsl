@@ -1,20 +1,26 @@
-// Three.js automatically provides these attributes
-// attribute vec3 position;  // provided by Three.js
-// attribute vec3 normal;    // provided by Three.js
-
-uniform mat4 u_model;
-uniform mat4 u_viewProjection;
+// Three.js automatically provides these attributes and uniforms
+// attribute vec3 position;
+// attribute vec3 normal;
+// attribute vec2 uv;
+// uniform mat4 modelMatrix;
+// uniform mat4 viewMatrix;
+// uniform mat4 projectionMatrix;
+// uniform mat3 normalMatrix;
 
 varying vec3 v_normal;
 varying vec3 v_position;
+varying vec2 v_uv;
 
 void main() {
-    // Use Three.js's built-in attributes: position and normal
-    vec4 worldPosition = u_model * vec4(position, 1.0);
+    // Use Three.js built-in uniforms
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
     v_position = worldPosition.xyz;
     
-    mat3 normalMatrix = mat3(u_model);
+    // Use Three.js built-in normalMatrix for proper normal transformation
     v_normal = normalize(normalMatrix * normal);
     
-    gl_Position = u_viewProjection * worldPosition;
+    // Pass UV coordinates to fragment shader
+    v_uv = uv;
+    
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
 }
