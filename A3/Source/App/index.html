@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" style="overflow-y: auto;">
+<head>
+    <title>Solar System Simulator</title>
+    <style>
+        body {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-content: center;
+            justify-content: center;
+            background-color: lightgrey;
+        }
+
+        canvas {
+            border: 5px solid black;
+            align-self: center;
+            justify-content: space-between;
+            background-color: white;
+        }
+    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+    <h1 style="align-self: center; font-family: gar;">Rube-Golberg Machine</h1>
+    <canvas id="gl-canvas" width="1230" height="750"></canvas>
+    
+    <script type="importmap">
+    {
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+    }
+    }
+    </script>    
+    <script type="module" src="utils.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
