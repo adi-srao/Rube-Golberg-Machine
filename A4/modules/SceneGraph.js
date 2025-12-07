@@ -1,173 +1,191 @@
+// SceneGraph.js
 import * as THREE from "three";
 
 export default class SceneGraph {
   constructor(materialFactory) {
     this.materialFactory = materialFactory;
 
-    // references you’ll need later for animation/collision
-    this.objects = {
-      ball1: null,
-      ball2: null,
-      dominos: [],
-      pendulum: {
+    this.graphs = {
+      phong: {
         root: null,
-        pivot: null,
-        rod: null,
-        bob: null,
+        objects: {},
       },
-      ring: {
-        base: null,
-        hoop: null,
+      gouraud: {
+        root: null,
+        objects: {},
       },
     };
   }
 
+  /**
+   * Builds two scenegraphs:
+   *  - one using Phong materials
+   *  - one using Gouraud materials
+   *
+   * Returns:
+   *  {
+   *    phong:   { root: Object3D, objects: {...} },
+   *    gouraud: { root: Object3D, objects: {...} }
+   *  }
+   */
   build(scene) {
-    const worldRoot = new THREE.Object3D();
-    worldRoot.name = 'worldRoot';
-    scene.add(worldRoot);
+    const phongRoot = new THREE.Object3D();
+    phongRoot.name = "RGM_Phong";
+    scene.add(phongRoot);
 
-    const staticRoot = new THREE.Object3D();
-    staticRoot.name = 'staticRoot';
-    worldRoot.add(staticRoot);
+    const gouraudRoot = new THREE.Object3D();
+    gouraudRoot.name = "RGM_Gouraud";
+    scene.add(gouraudRoot);
 
-    const dynamicRoot = new THREE.Object3D();
-    dynamicRoot.name = 'dynamicRoot';
-    worldRoot.add(dynamicRoot);
+    this.graphs.phong.root   = phongRoot;
+    this.graphs.gouraud.root = gouraudRoot;
 
-    this._buildGround(staticRoot);
-    this._buildRing(staticRoot);
-    this._buildTrackAndBall1(dynamicRoot);
-    this._buildDominos(dynamicRoot);
-    this._buildPendulum(dynamicRoot);
-    this._buildBall2(dynamicRoot);
+    this.graphs.phong.objects   = this._buildRGM(phongRoot, "phong");
+    this.graphs.gouraud.objects = this._buildRGM(gouraudRoot, "gouraud");
 
-    return this.objects;
+    // Let MainApp control visibility; default handled there
+    return this.graphs;
   }
 
-  // ---------- static objects ----------
+  _buildRGM(root, mode) {
+    const objects = {
+      ball1: null,
+      ball2: null,
+      dominos: [],
+      pendulum: { root: null, pivot: null, rod: null, bob: null },
+      ring: { base: null, hoop: null },
+    };
 
-  _buildGround(parent) {
+    const staticRoot = new THREE.Object3D();
+    staticRoot.name = `staticRoot_${mode}`;
+    root.add(staticRoot);
+
+    const dynamicRoot = new THREE.Object3D();
+    dynamicRoot.name = `dynamicRoot_${mode}`;
+    root.add(dynamicRoot);
+
+    this._buildGround(staticRoot, mode);
+    this._buildRing(staticRoot, mode, objects);
+    this._buildTrackAndBall1(dynamicRoot, mode, objects);
+    this._buildDominos(dynamicRoot, mode, objects);
+    this._buildPendulum(dynamicRoot, mode, objects);
+    this._buildBall2(dynamicRoot, mode, objects);
+
+    return objects;
+  }
+
+  _buildGround(parent, mode) {
     const geo = new THREE.PlaneGeometry(50, 50);
-    const mat = this.materialFactory.createGroundMaterial(); // A3-based
+    const mat = this.materialFactory.createGroundMaterial(mode);
+
     const ground = new THREE.Mesh(geo, mat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
     ground.receiveShadow = true;
-    ground.name = 'groundPlane';
+    ground.name = `groundPlane_${mode}`;
+
     parent.add(ground);
   }
 
-  _buildRing(parent) {
-    // base
+  _buildRing(parent, mode, objects) {
     const baseGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.2, 32);
-    const baseMat = this.materialFactory.createRingBaseMaterial();
+    const baseMat = this.materialFactory.createRingBaseMaterial(mode);
     const base = new THREE.Mesh(baseGeo, baseMat);
-    base.position.set(10, 0.1, 0); // example position
+    base.position.set(10, 0.1, 0);
     base.receiveShadow = true;
     parent.add(base);
 
-    // hoop
     const hoopGeo = new THREE.TorusGeometry(1.2, 0.05, 16, 64);
-    const hoopMat = this.materialFactory.createRingHoopMaterial();
+    const hoopMat = this.materialFactory.createRingHoopMaterial(mode);
     const hoop = new THREE.Mesh(hoopGeo, hoopMat);
     hoop.position.set(10, 0.3, 0);
     hoop.rotation.x = Math.PI / 2;
-
     parent.add(hoop);
 
-    this.objects.ring.base = base;
-    this.objects.ring.hoop = hoop;
+    objects.ring.base = base;
+    objects.ring.hoop = hoop;
   }
 
-  // ---------- dynamic objects ----------
-
-  _buildTrackAndBall1(parent) {
-    // simple ramp as a box
+  _buildTrackAndBall1(parent, mode, objects) {
     const rampGeo = new THREE.BoxGeometry(8, 0.3, 1);
-    const rampMat = this.materialFactory.createWoodTrackMaterial();
+    const rampMat = this.materialFactory.createWoodTrackMaterial(mode);
     const ramp = new THREE.Mesh(rampGeo, rampMat);
     ramp.position.set(-10, 1.5, 0);
-    ramp.rotation.z = -Math.PI / 10; // slight incline
+    ramp.rotation.z = -Math.PI / 10;
     ramp.castShadow = true;
     ramp.receiveShadow = true;
-
     parent.add(ramp);
 
-    // ball1 on ramp
     const ballGeo = new THREE.SphereGeometry(0.3, 32, 32);
-    const ballMat = this.materialFactory.createMetalBallMaterial();
+    const ballMat = this.materialFactory.createMetalBallMaterial(mode);
     const ball1 = new THREE.Mesh(ballGeo, ballMat);
-    ball1.position.set(-13, 2.0, 0); // adjust based on ramp
+    ball1.position.set(-13, 2.0, 0);
     ball1.castShadow = true;
-
     parent.add(ball1);
 
-    this.objects.ball1 = ball1;
+    objects.ball1 = ball1;
   }
 
-  _buildDominos(parent) {
+  _buildDominos(parent, mode, objects) {
     const dominoRoot = new THREE.Object3D();
-    dominoRoot.name = 'dominoRoot';
+    dominoRoot.name = `dominoRoot_${mode}`;
     parent.add(dominoRoot);
 
     const dominoGeo = new THREE.BoxGeometry(0.2, 1.0, 0.5);
-    const dominoMat = this.materialFactory.createDominoMaterial();
+    const baseMat = this.materialFactory.createDominoMaterial(mode);
 
     const count = 10;
     const spacing = 0.7;
+
     for (let i = 0; i < count; i++) {
-      const domino = new THREE.Mesh(dominoGeo, dominoMat.clone());
-      domino.position.set(-4 + i * spacing, 0.5, 0); // line in +x direction
+      const mat = baseMat.clone(); // separate material in case you tint fallen ones later
+      const domino = new THREE.Mesh(dominoGeo, mat);
+      domino.position.set(-4 + i * spacing, 0.5, 0);
       domino.castShadow = true;
       dominoRoot.add(domino);
-      this.objects.dominos.push(domino);
+      objects.dominos.push(domino);
     }
   }
 
-  _buildPendulum(parent) {
+  _buildPendulum(parent, mode, objects) {
     const pendulumRoot = new THREE.Object3D();
-    pendulumRoot.name = 'pendulumRoot';
+    pendulumRoot.name = `pendulumRoot_${mode}`;
     parent.add(pendulumRoot);
 
-    // pivot at top (this is the one you'll rotate later)
     const pivot = new THREE.Object3D();
     pivot.position.set(2, 4, 0); // height above ground
-    pivot.name = 'pendulumPivot';
+    pivot.name = `pendulumPivot_${mode}`;
     pendulumRoot.add(pivot);
 
-    // thin rod: cuboid
     const rodLength = 3;
     const rodGeo = new THREE.BoxGeometry(0.1, rodLength, 0.1);
-    const rodMat = this.materialFactory.createPendulumRodMaterial();
+    const rodMat = this.materialFactory.createPendulumRodMaterial(mode);
     const rod = new THREE.Mesh(rodGeo, rodMat);
-    rod.position.set(0, -rodLength / 2, 0); 
+    rod.position.set(0, -rodLength / 2, 0);
     rod.castShadow = true;
     pivot.add(rod);
 
-    // bob: sphere at rod end
     const bobGeo = new THREE.SphereGeometry(0.4, 32, 32);
-    const bobMat = this.materialFactory.createMetalBallMaterial();
+    const bobMat = this.materialFactory.createMetalBallMaterial(mode);
     const bob = new THREE.Mesh(bobGeo, bobMat);
     bob.position.set(0, -rodLength, 0);
     bob.castShadow = true;
     pivot.add(bob);
 
-    this.objects.pendulum.root = pendulumRoot;
-    this.objects.pendulum.pivot = pivot;
-    this.objects.pendulum.rod = rod;
-    this.objects.pendulum.bob = bob;
+    objects.pendulum.root = pendulumRoot;
+    objects.pendulum.pivot = pivot;
+    objects.pendulum.rod = rod;
+    objects.pendulum.bob = bob;
   }
 
-  _buildBall2(parent) {
+  _buildBall2(parent, mode, objects) {
     const ballGeo = new THREE.SphereGeometry(0.35, 32, 32);
-    const ballMat = this.materialFactory.createMetalBallMaterial();
+    const ballMat = this.materialFactory.createMetalBallMaterial(mode);
     const ball2 = new THREE.Mesh(ballGeo, ballMat);
-    // place near pendulum so it can be knocked off a ledge later
     ball2.position.set(6, 2.0, 0);
     ball2.castShadow = true;
-
     parent.add(ball2);
-    this.objects.ball2 = ball2;
+
+    objects.ball2 = ball2;
   }
 }

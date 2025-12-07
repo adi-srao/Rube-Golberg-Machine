@@ -1,3 +1,6 @@
+precision mediump float;
+
+
 attribute vec3 a_position;
 attribute vec3 a_normal;
 
