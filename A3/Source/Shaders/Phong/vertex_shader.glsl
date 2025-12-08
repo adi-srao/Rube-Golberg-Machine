@@ -1,9 +1,5 @@
 precision mediump float;
 
-// Three.js built-in attributes
-// attribute vec3 position;  // automatically provided
-// attribute vec3 normal;    // automatically provided
-
 // Three.js built-in uniforms
 // uniform mat4 modelMatrix;
 // uniform mat4 viewMatrix;
