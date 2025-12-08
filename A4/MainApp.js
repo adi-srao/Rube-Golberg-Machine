@@ -110,12 +110,49 @@ async function init() {
   graphs.gouraud.root.visible = false;
 
   window.addEventListener("keydown", (e) => {
-    if (e.key === "s" || e.key === "S") {
+    if (e.key === "p" || e.key === "P") {
       currentMode = currentMode === "phong" ? "gouraud" : "phong";
       graphs.phong.root.visible = currentMode === "phong";
       graphs.gouraud.root.visible = currentMode === "gouraud";
       console.log("Switched shading to", currentMode);
     }
+
+    else if (e.key == "a" || e.key == "A") {
+      //shift camera to the left
+      camera1.position.x -= 1;
+      camera1.lookAt(0, 0, 0);
+    }
+
+    else if (e.key == "d" || e.key == "D") {
+      //shift camera to the left
+      camera1.position.x += 1;
+      camera1.lookAt(0, 0, 0);
+    }
+
+    else if (e.key == "w" || e.key == "W") {
+      //shift camera to the left
+      camera1.position.z -= 1;
+      camera1.lookAt(0, 0, 0);
+    }
+
+    else if (e.key == "s" || e.key == "S") {
+      //shift camera to the left
+      camera1.position.z += 1;
+      camera1.lookAt(0, 0, 0);
+    }
+
+    else if (e.key == "q" || e.key == "Q") {
+      //shift camera to the left
+      camera1.position.y -= 1;
+      camera1.lookAt(0, 0, 0);
+    }
+
+    else if (e.key == "e" || e.key == "E") {
+      //shift camera to the left
+      camera1.position.y += 1;
+      camera1.lookAt(0, 0, 0);
+    }
+
   });
 
   // 4. Resize handling
@@ -126,6 +163,7 @@ async function init() {
     camera1.aspect = w / h;
     camera1.updateProjectionMatrix();
   });
+
 
   // 5. Start render loop
   animate();
