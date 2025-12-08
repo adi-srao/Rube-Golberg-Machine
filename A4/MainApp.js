@@ -1,6 +1,11 @@
 import * as THREE from "three";
 import SceneGraph from "./modules/SceneGraph.js";
 import MaterialFactory from "./modules/MaterialFactory.js";
+import AnimationSystem from "./modules/AnimationSystem.js";
+import CollisionSystem from "./modules/CollisionSystem.js";
+import RGMController from "./modules/RGMController.js";
+import CameraManager from "./modules/CameraManager.js";
+import LightingManager from "./modules/LightingManager.js";
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x202025);
@@ -41,13 +46,11 @@ scene.add(lightHelper);
 const clock = new THREE.Clock();
 
 //mode
-let currentMode = "phong";
+let currentMode = "blinn";
 
 function updateShaderUniforms(scene, camera, light) {
-  // Make sure camera matrices are fresh
   camera.updateMatrixWorld();
 
-  // Precompute viewProjection once per frame
   const viewProjection = new THREE.Matrix4();
   viewProjection.multiplyMatrices(
     camera.projectionMatrix,      // P
@@ -61,22 +64,17 @@ function updateShaderUniforms(scene, camera, light) {
 
     const u = mat.uniforms;
 
-    // Only touch materials that actually use our custom uniforms
     if (!u.u_model || !u.u_viewProjection) return;
 
-    // 1. u_model = mesh.matrixWorld
     obj.updateMatrixWorld();
     u.u_model.value.copy(obj.matrixWorld);
 
-    // 2. u_viewProjection = P * V
     u.u_viewProjection.value.copy(viewProjection);
 
-    // 3. u_viewPosition = camera position in world space
     if (u.u_viewPosition) {
       u.u_viewPosition.value.setFromMatrixPosition(camera.matrixWorld);
     }
 
-    // 4. u_lightPosition = main light position in world space
     if (light && u.u_lightPosition) {
       u.u_lightPosition.value.copy(light.position);
     }
@@ -86,10 +84,68 @@ function updateShaderUniforms(scene, camera, light) {
 
 async function init() {
 
+  function buildRGMObjects(graphs) {
+    // Helper to collect corresponding meshes in all 3 graphs
+    const collect = (name) => ({
+      phong:   graphs.phong.objects[name],
+      gouraud: graphs.gouraud.objects[name],
+      blinn:   graphs.blinn.objects[name],
+    });
+
+    return {
+      ball1: {
+        meshes: collect("ball1"),
+        radius: 0.3,
+        position: new THREE.Vector3(),   // logical position
+        velocity: new THREE.Vector3(),   // logical velocity
+        active: false,
+      },
+      ball2: {
+        meshes: collect("ball2"),
+        radius: 0.35,
+        position: new THREE.Vector3(),
+        velocity: new THREE.Vector3(),
+        active: false,
+      },
+      dominos: graphs.phong.objects.dominos.map((_, i) => ({
+        meshes: {
+          phong:   graphs.phong.objects.dominos[i],
+          gouraud: graphs.gouraud.objects.dominos[i],
+          blinn:   graphs.blinn.objects.dominos[i],
+        },
+        // orientation state, angle, angular velocity etc.
+        angle: 0,
+        angularVelocity: 0,
+        fallen: false,
+      })),
+      pendulum: {
+        pivotMeshes: {
+          phong:   graphs.phong.objects.pendulum.pivot,
+          gouraud: graphs.gouraud.objects.pendulum.pivot,
+          blinn:   graphs.blinn.objects.pendulum.pivot,
+        },
+        angle: 0,
+        angularVelocity: 0,
+        length: 3,
+        active: false,
+      },
+      // ring/hoop if you want to collide with ball2
+      ring: {
+        meshes: {
+          phong:   graphs.phong.objects.ring.hoop,
+          gouraud: graphs.gouraud.objects.ring.hoop,
+          blinn:   graphs.blinn.objects.ring.hoop,
+        },
+        // maybe for scoring if ball2 passes through
+      },
+    };
+  }
+
 
   const materialFactory = await MaterialFactory.create();
   const sceneGraph = new SceneGraph(materialFactory);
   const graphs = sceneGraph.build(scene); 
+  
 
   //changes attribute name from position to a_position to maintain consistency with glsl
   scene.traverse((obj) => {
@@ -105,16 +161,44 @@ async function init() {
     }
   });
 
-  let currentMode = "phong";
-  graphs.phong.root.visible = true;
+  currentMode = "blinn";
+  graphs.blinn.root.visible = true;
+  graphs.phong.root.visible = false;
   graphs.gouraud.root.visible = false;
 
+  const rgmObjects      = buildRGMObjects(graphs);
+  const rgmController   = new RGMController(rgmObjects);
+  const animationSystem = new AnimationSystem(rgmObjects);
+  const collisionSystem = new CollisionSystem(rgmObjects);
+  const lightingManager = new LightingManager(mainLight);
+  const cameraManager   = new CameraManager(camera1);
+
+  window._systems = {
+    rgmController,
+    animationSystem,
+    collisionSystem,
+    lightingManager,
+    cameraManager,
+  };
+  
+
   window.addEventListener("keydown", (e) => {
+    //cycle through modes "phong", "gouraud", "blinn"
     if (e.key === "p" || e.key === "P") {
-      currentMode = currentMode === "phong" ? "gouraud" : "phong";
-      graphs.phong.root.visible = currentMode === "phong";
-      graphs.gouraud.root.visible = currentMode === "gouraud";
-      console.log("Switched shading to", currentMode);
+      if (currentMode === "phong") {
+        currentMode = "gouraud";
+        graphs.phong.root.visible = false;
+        graphs.gouraud.root.visible = true;
+      } else if (currentMode === "gouraud") {
+        currentMode = "blinn";
+        graphs.gouraud.root.visible = false;
+        graphs.blinn.root.visible = true;
+      } else if (currentMode === "blinn") {
+        currentMode = "phong";
+        graphs.blinn.root.visible = false;
+        graphs.phong.root.visible = true;
+      }
+      
     }
 
     else if (e.key == "a" || e.key == "A") {
@@ -177,6 +261,15 @@ function animate() {
     const delta = clock.getDelta();
 
     updateShaderUniforms(scene, camera1, mainLight);
+
+    const { rgmController, animationSystem, collisionSystem,
+          lightingManager, cameraManager } = window._systems;
+
+    rgmController.update(delta, collisionSystem.events);
+    animationSystem.update(delta);
+    collisionSystem.update(delta);
+    lightingManager.update(delta);
+    cameraManager.update(delta);
   
     renderer.render(scene, camera1);
 }

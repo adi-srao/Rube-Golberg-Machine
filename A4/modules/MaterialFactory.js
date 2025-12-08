@@ -15,21 +15,26 @@ export default class MaterialFactory {
    * It loads all GLSL files, then returns a ready instance.
    */
   static async create() {
-    const [phongVS, phongFS, gouraudVS, gouraudFS] = await Promise.all([
+    const [phongVS, phongFS, gouraudVS, gouraudFS, blinnVS, blinnFS] = await Promise.all([
       loadShader("../../A3/Source/Shaders/Phong/vertex_shader.glsl"),
       loadShader("../../A3/Source/Shaders/Phong/fragment_shader.glsl"),
       loadShader("../../A3/Source/Shaders/Gouraud/vertex_shader.glsl"),
       loadShader("../../A3/Source/Shaders/Gouraud/fragment_shader.glsl"),
+      loadShader("../../A3/Source/Shaders/Blinn_Phong/vertex_shader.glsl"),
+      loadShader("../../A3/Source/Shaders/Blinn_Phong/fragment_shader.glsl"),
+
     ]);
 
-    return new MaterialFactory({ phongVS, phongFS, gouraudVS, gouraudFS });
+    return new MaterialFactory({ phongVS, phongFS, gouraudVS, gouraudFS, blinnVS, blinnFS });
   }
 
-  constructor({ phongVS, phongFS, gouraudVS, gouraudFS }) {
+  constructor({ phongVS, phongFS, gouraudVS, gouraudFS, blinnVS, blinnFS }) {
     this.phongVS = phongVS;
     this.phongFS = phongFS;
     this.gouraudVS = gouraudVS;
     this.gouraudFS = gouraudFS;
+    this.blinnVS = blinnVS;
+    this.blinnFS = blinnFS;
 
     this.textureLoader = new THREE.TextureLoader();
 
@@ -52,8 +57,8 @@ export default class MaterialFactory {
       u_model:          { value: new THREE.Matrix4() },
       u_viewProjection: { value: new THREE.Matrix4() },
       u_color: { value: new THREE.Color(color) },
-      u_useTexture: { value: useTexture },
-      u_texture:    { value: map || null },
+      u_useMap: { value: useTexture },
+      u_map:    { value: map || null },
       u_lightPosition:   { value: new THREE.Vector3(10, 20, 10) },
       u_lightColor: { value: new THREE.Color(0xffffff) },
       u_shininess:  { value: shininess },
@@ -62,13 +67,13 @@ export default class MaterialFactory {
     const shaders =
       mode === "gouraud"
         ? { vertexShader: this.gouraudVS, fragmentShader: this.gouraudFS }
-        : { vertexShader: this.phongVS,   fragmentShader: this.phongFS   };
+        :(mode === "blinn" ? { vertexShader: this.blinnVS, fragmentShader: this.blinnFS } : { vertexShader: this.phongVS,   fragmentShader: this.phongFS   });
 
 
-        console.log("=== Creating material - mode:", mode);
-        console.log("VERTEX SHADER:\n", shaders.vertexShader);
-        console.log("FRAGMENT SHADER:\n", shaders.fragmentShader);
-        console.log("UNIFORMS:", uniforms);
+        //console.log("=== Creating material - mode:", mode);
+        //console.log("VERTEX SHADER:\n", shaders.vertexShader);
+        //console.log("FRAGMENT SHADER:\n", shaders.fragmentShader);
+        //console.log("UNIFORMS:", uniforms);
     
     return new THREE.ShaderMaterial({
       vertexShader: shaders.vertexShader,
@@ -81,7 +86,7 @@ export default class MaterialFactory {
 
   createGroundMaterial(mode) {
     return this._createShaderMaterial(mode, {
-      color: 0x333333,
+      color: 0xffffff,
       map: this.checkerTex,
       shininess: 5,
     });

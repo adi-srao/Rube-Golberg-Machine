@@ -14,6 +14,10 @@ export default class SceneGraph {
         root: null,
         objects: {},
       },
+      blinn: {
+        root: null,
+        objects: {},
+      },
     };
   }
 
@@ -37,11 +41,17 @@ export default class SceneGraph {
     gouraudRoot.name = "RGM_Gouraud";
     scene.add(gouraudRoot);
 
+    const blinnRoot = new THREE.Object3D();
+    phongRoot.name = "RGM_Blinn";
+    scene.add(phongRoot);
+
     this.graphs.phong.root   = phongRoot;
     this.graphs.gouraud.root = gouraudRoot;
+    this.graphs.blinn.root   = blinnRoot;
 
     this.graphs.phong.objects   = this._buildRGM(phongRoot, "phong");
     this.graphs.gouraud.objects = this._buildRGM(gouraudRoot, "gouraud");
+    this.graphs.blinn.objects   = this._buildRGM(blinnRoot, "blinn");
 
     // Let MainApp control visibility; default handled there
     return this.graphs;
