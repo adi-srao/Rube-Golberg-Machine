@@ -3,7 +3,7 @@ import { initScene } from './SceneHandler.js';
 import { setupLights, getLightUniforms } from './LightHandler.js';
 import { createMeshGroup } from './MeshFactory.js';
 
-// --- State ---
+// State Variable
 const shadingModels = { 
     GOURAUD: 'gouraud', 
     PHONG: 'phong', 
@@ -12,27 +12,29 @@ const shadingModels = {
 let currentModel = shadingModels.GOURAUD;
 const meshVersions = {}; 
 
-// --- Init ---
+
 const { scene, camera, renderer, controls } = initScene('gl-canvas');
 const { lights, lightHelpers } = setupLights(scene);
 
-// --- 1. Dynamic Uniform Update System ---
-function updateAllMeshUniforms() {
+// Updating all shader materials with current light states 
+function updateAllMeshUniforms() 
+{
     const lightUniforms = getLightUniforms(lights);
 
-    Object.values(meshVersions).forEach((root) => {
+    Object.values(meshVersions).forEach((root) =>     
+    {
         if (!root) return;
         
-        root.traverse((child) => {
-            // Target any mesh with a ShaderMaterial
+        root.traverse((child) => 
+        {
+            // all children that are meshes with shader materials will have light uniforms updated
             if (child.isMesh && child.material && child.material.isShaderMaterial) {
                 
                 const uniforms = child.material.uniforms;
 
                 Object.keys(lightUniforms).forEach((key) => {
-                    if (uniforms[key]) {
+                    if (uniforms[key])
                         uniforms[key].value = lightUniforms[key];
-                    }
                 });
                 
                 child.material.uniformsNeedUpdate = true;
@@ -41,26 +43,26 @@ function updateAllMeshUniforms() {
     });
 }
 
-// --- 2. Model Switching Logic ---
-async function updateShadingModel(newModel) {
+// Function to ensure only 1 shading model is active at a time
+async function updateShadingModel(newModel) 
+{
     console.log(`Switching request: ${newModel}`);
 
-    // 1. Hide ALL existing models first (Scorched earth policy)
-    Object.values(meshVersions).forEach(root => {
-        if(root) root.visible = false;
-    });
+    // Hide all models initially
+    Object.values(meshVersions).forEach(root => { if(root) root.visible = false; });
 
     currentModel = newModel;
 
-    // 2. If already loaded, just show it
-    if (meshVersions[newModel]) {
+    // Only loaded models are shown, using the current lighting state
+    if (meshVersions[newModel]) 
+    {
         meshVersions[newModel].visible = true;
-        updateAllMeshUniforms(); // Apply current lighting state
+        updateAllMeshUniforms(); 
         console.log(`Restored ${newModel} from cache`);
         return;
     }
 
-    // 3. Load from scratch
+    // Load the model for the first time, depending on the shading model
     let vPath, fPath;
     const basePath = '../Shaders';
     if (newModel === shadingModels.GOURAUD) {
@@ -74,7 +76,8 @@ async function updateShadingModel(newModel) {
         fPath = `${basePath}/Blinn_Phong/fragment_shader.glsl`;
     }
 
-    const config = {
+    const config = 
+    {
         objPath: '../../Models/Sphere.obj',
         mtlPath: '../../Models/Sphere.mtl',
         texturePath: '../../Textures/2.jpg',
@@ -83,10 +86,12 @@ async function updateShadingModel(newModel) {
         fShaderPath: fPath
     };
 
-    try {
+    try 
+    {
         const root = await createMeshGroup(scene, config);
 
-        if (root) {
+        if (root) 
+        {
             meshVersions[newModel] = root;
             
             // Ensure only this one is visible
@@ -96,16 +101,16 @@ async function updateShadingModel(newModel) {
             console.log(`Loaded ${newModel}`);
             updateAllMeshUniforms();
         }
-    } catch (err) {
+    } 
+    catch (err) {
         console.error(`Failed to load ${newModel}:`, err);
     }
 }
 
-// --- 3. Event Listeners ---
 window.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
 
-    // Toggle Lights 1-4
+    // For keys 1-4, toggle corresponding light visibility uniform
     if (key >= '1' && key <= '4') 
     {
         const index = parseInt(key) - 1;
@@ -125,12 +130,12 @@ window.addEventListener('keydown', (event) => {
         }
     }
 
+    // For keys G, P, B - switch shading models
     if (key === 'g') updateShadingModel(shadingModels.GOURAUD);
     if (key === 'p') updateShadingModel(shadingModels.PHONG);
     if (key === 'b') updateShadingModel(shadingModels.BLINN_PHONG);
 });
 
-// --- 4. Start ---
 async function start() {
     await updateShadingModel(shadingModels.GOURAUD);
     animate();
