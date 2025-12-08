@@ -39,8 +39,8 @@ export default class MaterialFactory {
     this.textureLoader = new THREE.TextureLoader();
 
     // Adjust texture paths to your actual files
-    this.checkerTex = this._loadTexture("../../A3/Textures/1.jpg", 2);
-    this.woodTex    = this._loadTexture("../../A3/Textures/1.jpg", 2);
+    this.checkerTex = this._loadTexture("../../A3/Textures/2.jpg", 2);
+    this.woodTex    = this._loadTexture("../../A3/Textures/wood.jpg", 2);
   }
 
   _loadTexture(path, repeat = 1) {
@@ -57,17 +57,19 @@ export default class MaterialFactory {
       u_model:          { value: new THREE.Matrix4() },
       u_viewProjection: { value: new THREE.Matrix4() },
       u_color: { value: new THREE.Color(color) },
-      u_useMap: { value: useTexture },
+      u_useMap: { value: useTexture ? 1.0 : 0.0},
       u_map:    { value: map || null },
       u_lightPosition:   { value: new THREE.Vector3(10, 20, 10) },
       u_lightColor: { value: new THREE.Color(0xffffff) },
       u_shininess:  { value: shininess },
+      u_ambientColor: { value: new THREE.Color(0xaaaaaa) },
+      u_specularColor: { value: new THREE.Color(0xffffff) },
+      u_emissionColor: { value: new THREE.Color(0x000000) },
+      u_lightIntensity: { value: 1.0 },
+      
     };
 
-    const shaders =
-      mode === "gouraud"
-        ? { vertexShader: this.gouraudVS, fragmentShader: this.gouraudFS }
-        :(mode === "blinn" ? { vertexShader: this.blinnVS, fragmentShader: this.blinnFS } : { vertexShader: this.phongVS,   fragmentShader: this.phongFS   });
+    const shaders = mode === "gouraud" ? { vertexShader: this.gouraudVS, fragmentShader: this.gouraudFS } :(mode === "blinn" ? { vertexShader: this.blinnVS, fragmentShader: this.blinnFS } : { vertexShader: this.phongVS,   fragmentShader: this.phongFS   });
 
 
         //console.log("=== Creating material - mode:", mode);
@@ -103,7 +105,7 @@ export default class MaterialFactory {
   createRingHoopMaterial(mode) {
     return this._createShaderMaterial(mode, {
       color: 0xddddff,
-      map: null,
+      map: this.woodTex,
       shininess: 80,
     });
   }
