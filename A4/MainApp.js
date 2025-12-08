@@ -1,246 +1,347 @@
+// MainApp.js (Updated with Camera System)
 import * as THREE from "three";
 import SceneGraph from "./modules/SceneGraph.js";
 import MaterialFactory from "./modules/MaterialFactory.js";
+import { updateShaderUniforms } from "./modules/ShaderUniforms.js";
+import InputManager from "./modules/InputManager.js";
+import CameraController from "./modules/CameraController.js";
+import LightHandler from "./modules/LightHandler.js";
 import AnimationSystem from "./modules/AnimationSystem.js";
 import CollisionSystem from "./modules/CollisionSystem.js";
 import RGMController from "./modules/RGMController.js";
-import CameraManager from "./modules/CameraManager.js";
-import LightingManager from "./modules/LightingManager.js";
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x202025);
 
-//camera-----------------------------------------------------
-const camera1 = new THREE.PerspectiveCamera(
+// cameras ----------------------------------------------------
+const orbitCamera = new THREE.PerspectiveCamera(
   50,
   window.innerWidth / window.innerHeight,
-  0.0001,
+  0.1,
   1000
 );
-camera1.position.set(15, 15, 20);
-camera1.lookAt(0, 0, 0);
+orbitCamera.position.set(0, 15, 25);
+orbitCamera.lookAt(10, 0, 0);
 
-//renderer----------------------------------------------------
+const followCamera = new THREE.PerspectiveCamera(
+  60,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+followCamera.position.set(0, 5, 5);
+followCamera.lookAt(0, 0, 0);
+
+// Active camera reference
+let activeCamera = orbitCamera;
+
+// renderer ---------------------------------------------------
 const renderer = new THREE.WebGLRenderer({
-  canvas: document.getElementById("myCanvas")
+  canvas: document.getElementById("myCanvas"),
 });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 
-//light----------------------------------------------------
-const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-scene.add(ambientLight);
-
-const mainLight = new THREE.PointLight(0xffffff, 1.0);
-mainLight.position.set(10, 20, 10);
-mainLight.castShadow = true;
-scene.add(mainLight);
-
-const lightHelper = new THREE.PointLightHelper(mainLight, 0.5);
-scene.add(lightHelper);
-
-//clock--------------------------------------------
+// clock ------------------------------------------------------
 const clock = new THREE.Clock();
 
-//mode
-let currentMode = "blinn";
+// shading mode state (shared with InputManager)
+const shadingState = {
+  currentMode: "blinn",
+};
 
+// systems (filled in init)
+let graphsGlobal = null;
+let inputManager = null;
+let cameraController = null;
+let lightHandler = null;
+let controller = null;
+let animationSystem = null;
+let collisionSystem = null;
+let rgmObjects = null;
 
+// rgmObjects builder
+function buildRGMObjects(graphs) {
+  const rgm = {};
 
+  // --- Balls ---
+  const b1Phong   = graphs.phong.objects.ball1;
+  const b1Gouraud = graphs.gouraud.objects.ball1;
+  const b1Blinn   = graphs.blinn.objects.ball1;
+
+  rgm.ball1 = {
+    meshes: {
+      phong:   b1Phong,
+      gouraud: b1Gouraud,
+      blinn:   b1Blinn,
+    },
+    position: b1Phong.position.clone(),
+    velocity: new THREE.Vector3(),
+    radius: 0.3,
+    active: true,
+  };
+
+  const b2Phong   = graphs.phong.objects.ball2;
+  const b2Gouraud = graphs.gouraud.objects.ball2;
+  const b2Blinn   = graphs.blinn.objects.ball2;
+
+  rgm.ball2 = {
+    meshes: {
+      phong:   b2Phong,
+      gouraud: b2Gouraud,
+      blinn:   b2Blinn,
+    },
+    position: b2Phong.position.clone(),
+    velocity: new THREE.Vector3(),
+    radius: 0.35,
+    active: false,
+  };
+
+  // --- Dominos ---
+  const dominosPhong   = graphs.phong.objects.dominos;
+  const dominosGouraud = graphs.gouraud.objects.dominos;
+  const dominosBlinn   = graphs.blinn.objects.dominos;
+
+  rgm.dominos = dominosPhong.map((meshPhong, i) => ({
+    meshes: {
+      phong:   meshPhong,
+      gouraud: dominosGouraud[i],
+      blinn:   dominosBlinn[i],
+    },
+    angle: 0,
+    angularVelocity: 0,
+    fallen: false,
+  }));
+
+  // --- Pendulum ---
+  const pendPhong   = graphs.phong.objects.pendulum;
+  const pendGouraud = graphs.gouraud.objects.pendulum;
+  const pendBlinn   = graphs.blinn.objects.pendulum;
+
+  rgm.pendulum = {
+    length: 3,
+    angle: 0,
+    angularVelocity: 0,
+    active: false,
+    pivotMeshes: {
+      phong:   pendPhong.pivot,
+      gouraud: pendGouraud.pivot,
+      blinn:   pendBlinn.pivot,
+    },
+    bobMeshes: {
+      phong:   pendPhong.bob,
+      gouraud: pendGouraud.bob,
+      blinn:   pendBlinn.bob,
+    }
+  };
+
+  // --- Ramp ---
+  const rampPhong   = graphs.phong.objects.ramp;
+  const rampGouraud = graphs.gouraud.objects.ramp;
+  const rampBlinn   = graphs.blinn.objects.ramp;
+
+  rgm.ramp = {
+    meshes: {
+      phong:   rampPhong,
+      gouraud: rampGouraud,
+      blinn:   rampBlinn,
+    }
+  };
+
+  return rgm;
+}
+
+//----------------------------------------init------------------------------------------
 async function init() {
+  // Initialize LightHandler first
+  lightHandler = new LightHandler(scene);
 
-  function buildRGMObjects(graphs) {
-    // Helper to collect corresponding meshes in all 3 graphs
-    const collect = (name) => ({
-      phong:   graphs.phong.objects[name],
-      gouraud: graphs.gouraud.objects[name],
-      blinn:   graphs.blinn.objects[name],
-    });
-
-    return {
-      ball1: {
-        meshes: collect("ball1"),
-        radius: 0.3,
-        position: new THREE.Vector3(),   // logical position
-        velocity: new THREE.Vector3(),   // logical velocity
-        active: false,
-      },
-      ball2: {
-        meshes: collect("ball2"),
-        radius: 0.35,
-        position: new THREE.Vector3(),
-        velocity: new THREE.Vector3(),
-        active: false,
-      },
-      dominos: graphs.phong.objects.dominos.map((_, i) => ({
-        meshes: {
-          phong:   graphs.phong.objects.dominos[i],
-          gouraud: graphs.gouraud.objects.dominos[i],
-          blinn:   graphs.blinn.objects.dominos[i],
-        },
-        // orientation state, angle, angular velocity etc.
-        angle: 0,
-        angularVelocity: 0,
-        fallen: false,
-      })),
-      pendulum: {
-        pivotMeshes: {
-          phong:   graphs.phong.objects.pendulum.pivot,
-          gouraud: graphs.gouraud.objects.pendulum.pivot,
-          blinn:   graphs.blinn.objects.pendulum.pivot,
-        },
-        angle: 0,
-        angularVelocity: 0,
-        length: 3,
-        active: false,
-      },
-      // ring/hoop if you want to collide with ball2
-      ring: {
-        meshes: {
-          phong:   graphs.phong.objects.ring.hoop,
-          gouraud: graphs.gouraud.objects.ring.hoop,
-          blinn:   graphs.blinn.objects.ring.hoop,
-        },
-        // maybe for scoring if ball2 passes through
-      },
-    };
-  }
-
-
-  const materialFactory = await MaterialFactory.create();
-  const sceneGraph = new SceneGraph(materialFactory);
-  const graphs = sceneGraph.build(scene); 
+  // Create MaterialFactory with LightHandler
+  const materialFactory = await MaterialFactory.create(lightHandler);
   
+  const sceneGraph = new SceneGraph(materialFactory);
+  const graphs = sceneGraph.build(scene);
+  graphsGlobal = graphs;
 
-  //changes attribute name from position to a_position to maintain consistency with glsl
-  scene.traverse((obj) => {
-    if (!obj.isMesh) return;
-    const geo = obj.geometry;
-    if (!geo) return;
+  console.log("[init] graphs keys:", Object.keys(graphs));
 
-    if (!geo.getAttribute("a_position") && geo.getAttribute("position")) {
-      geo.setAttribute("a_position", geo.getAttribute("position"));
-    }
-    if (!geo.getAttribute("a_normal") && geo.getAttribute("normal")) {
-      geo.setAttribute("a_normal", geo.getAttribute("normal"));
-    }
-  });
-
-  currentMode = "blinn";
-  graphs.blinn.root.visible = true;
-  graphs.phong.root.visible = false;
+  // Initial visibility: blinn on, others off
+  shadingState.currentMode = "blinn";
+  graphs.blinn.root.visible   = true;
+  graphs.phong.root.visible   = false;
   graphs.gouraud.root.visible = false;
 
-  const rgmObjects      = buildRGMObjects(graphs);
-  const rgmController   = new RGMController(rgmObjects);
-  const animationSystem = new AnimationSystem(rgmObjects);
-  const collisionSystem = new CollisionSystem(rgmObjects);
-  const lightingManager = new LightingManager(mainLight);
-  const cameraManager   = new CameraManager(camera1);
+  rgmObjects = buildRGMObjects(graphs);
 
-  window._systems = {
-    rgmController,
-    animationSystem,
-    collisionSystem,
-    lightingManager,
-    cameraManager,
-  };
-  
+  // Initialize Camera Controller
+  cameraController = new CameraController(
+    orbitCamera,
+    followCamera,
+    renderer.domElement,
+    rgmObjects
+  );
 
-  window.addEventListener("keydown", (e) => {
-    //cycle through modes "phong", "gouraud", "blinn"
-    if (e.key === "p" || e.key === "P") {
-      if (currentMode === "phong") {
-        currentMode = "gouraud";
-        graphs.phong.root.visible = false;
-        graphs.gouraud.root.visible = true;
-      } else if (currentMode === "gouraud") {
-        currentMode = "blinn";
-        graphs.gouraud.root.visible = false;
-        graphs.blinn.root.visible = true;
-      } else if (currentMode === "blinn") {
-        currentMode = "phong";
-        graphs.blinn.root.visible = false;
-        graphs.phong.root.visible = true;
-      }
-      
-    }
+  // Update active camera reference
+  activeCamera = cameraController.getActiveCamera();
 
-    else if (e.key == "a" || e.key == "A") {
-      //shift camera to the left
-      camera1.position.x -= 1;
-      camera1.lookAt(0, 0, 0);
-    }
+  // Systems
+  inputManager    = new InputManager(activeCamera, graphs, shadingState, lightHandler);
+  controller      = new RGMController(rgmObjects);
+  animationSystem = new AnimationSystem(rgmObjects);
+  collisionSystem = new CollisionSystem(rgmObjects, { debugBounds: true });
 
-    else if (e.key == "d" || e.key == "D") {
-      //shift camera to the left
-      camera1.position.x += 1;
-      camera1.lookAt(0, 0, 0);
-    }
+  // Set up keyboard controls
+  setupControls();
 
-    else if (e.key == "w" || e.key == "W") {
-      //shift camera to the left
-      camera1.position.z -= 1;
-      camera1.lookAt(0, 0, 0);
-    }
-
-    else if (e.key == "s" || e.key == "S") {
-      //shift camera to the left
-      camera1.position.z += 1;
-      camera1.lookAt(0, 0, 0);
-    }
-
-    else if (e.key == "q" || e.key == "Q") {
-      //shift camera to the left
-      camera1.position.y -= 1;
-      camera1.lookAt(0, 0, 0);
-    }
-
-    else if (e.key == "e" || e.key == "E") {
-      //shift camera to the left
-      camera1.position.y += 1;
-      camera1.lookAt(0, 0, 0);
-    }
-
-  });
-
-  // 4. Resize handling
+  // Resize handling
   window.addEventListener("resize", () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
     renderer.setSize(w, h);
-    camera1.aspect = w / h;
-    camera1.updateProjectionMatrix();
+    
+    orbitCamera.aspect = w / h;
+    orbitCamera.updateProjectionMatrix();
+    
+    followCamera.aspect = w / h;
+    followCamera.updateProjectionMatrix();
   });
 
-
-  // 5. Start render loop
   animate();
 }
 
+function setupControls() {
+  // Keyboard controls
+  document.addEventListener('keydown', (e) => {
+    // Light controls
+    if (e.key === '1') lightHandler.toggleLight('point');
+    if (e.key === '2') lightHandler.toggleLight('directional');
+    if (e.key === '3') lightHandler.toggleLight('tracking');
+    if (e.key === 'h' || e.key === 'H') {
+      const firstHelper = lightHandler.lightHelpers[0];
+      const currentlyVisible = firstHelper.helper.visible;
+      lightHandler.setHelpersVisible(!currentlyVisible);
+      console.log(`[LightHandler] Helpers: ${!currentlyVisible ? 'ON' : 'OFF'}`);
+    }
 
+    // Camera controls
+    if (e.key === 'c' || e.key === 'C') {
+      cameraController.toggleCameraMode();
+      activeCamera = cameraController.getActiveCamera();
+      console.log(`[Camera] Mode: ${cameraController.getCameraMode()}`);
+    }
 
-function animate() {
-    requestAnimationFrame(animate);
-  
-    const delta = clock.getDelta();
+    // Follow camera rotation (only works in follow mode)
+    if (e.key === 'q' || e.key === 'Q') {
+      cameraController.rotateFollowCamera(-0.05); // Rotate left
+    }
+    if (e.key === 'e' || e.key === 'E') {
+      cameraController.rotateFollowCamera(0.05); // Rotate right
+    }
+  });
 
-    updateShaderUniforms(scene, camera1, mainLight);
-
-    const { rgmController, animationSystem, collisionSystem,
-          lightingManager, cameraManager } = window._systems;
-
-    rgmController.update(delta, collisionSystem.events);
-    animationSystem.update(delta);
-    collisionSystem.update(delta);
-    lightingManager.update(delta);
-    cameraManager.update(delta);
-  
-    renderer.render(scene, camera1);
+  console.log("\n=== CONTROLS ===");
+  console.log("LIGHTS:");
+  console.log("  1 - Toggle Point Light");
+  console.log("  2 - Toggle Directional Spotlight");
+  console.log("  3 - Toggle Tracking Spotlight");
+  console.log("  H - Toggle Light Helpers");
+  console.log("\nCAMERA:");
+  console.log("  C - Switch Camera Mode (Orbit/Follow)");
+  console.log("  Mouse Drag - Rotate Orbit Camera (Orbit Mode)");
+  console.log("  Q/E - Rotate Follow Camera Left/Right (Follow Mode)");
+  console.log("================\n");
 }
 
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = clock.getDelta();
+
+  // Update input
+  if (inputManager) inputManager.update(dt);
+  
+  // Update animations and physics
+  animationSystem.update(dt, controller.state);
+  collisionSystem.update(dt);
+  controller.update(dt, collisionSystem.events);
+
+  // Determine which object is currently active for tracking
+  const activeObject = getActiveObject();
+  
+  // Update tracking for lights and camera
+  if (activeObject) {
+    lightHandler.setTrackingTarget(activeObject.position);
+    cameraController.setFollowTarget(activeObject.position);
+  }
+
+  // Update camera
+  if (cameraController) {
+    cameraController.update(dt);
+    activeCamera = cameraController.getActiveCamera();
+  }
+
+  // Update light positions and orientations
+  if (lightHandler) lightHandler.update(dt);
+
+  // Update all shader uniforms with current light state
+  updateShaderUniforms(scene, activeCamera, lightHandler);
+
+  renderer.render(scene, activeCamera);
+}
+
+/**
+ * Gets the currently active moving object based on controller state
+ */
+function getActiveObject() {
+  if (!lightHandler || !controller) return null;
+
+  const state = controller.state;
+
+  if (state === 'BALL1_ROLLING' || state === 'BALL1_FALLING') {
+      // Track ball1
+      const mode = shadingState.currentMode;
+      const ball1Mesh = graphsGlobal[mode].objects.ball1;
+      if (ball1Mesh) {
+        return(ball1Mesh);
+      }
+    } else if (state === 'DOMINOS_FALLING') {
+      const mode = shadingState.currentMode;
+      const dominos = rgmObjects.dominos;
+      const meshDominos    = graphsGlobal[mode].objects.dominos; 
+      if (dominos && dominos.length > 0) {
+        // Track falling domino using number of fallen dominos and set it to that domino's position
+         let lastFallenIndex = -1;
+          for (let i = 0; i < dominos.length; i++) {
+            if (dominos[i].fallen) {
+              lastFallenIndex = i;
+            }
+          }
+  
+      if (lastFallenIndex >= 0) {
+          const targetMesh = meshDominos[lastFallenIndex];
+          return(targetMesh);
+        }
+      }      
+      
+    } else if (state === 'PENDULUM_SWINGING') {
+      // Track pendulum bob
+      const mode = shadingState.currentMode;
+      const pendulum = graphsGlobal[mode].objects.pendulum;
+      if (pendulum && pendulum.bob) {
+        return(pendulum.bob);
+      }
+    } else if (state === 'BALL2_ROLLING') {
+      // Track ball2
+      const mode = shadingState.currentMode;
+      const ball2Mesh = graphsGlobal[mode].objects.ball2;
+      if (ball2Mesh) {
+        return(ball2Mesh);
+      }
+    } else {
+      // No active object, point at scene center
+      return null;
+    }
+}
 
 init().catch((err) => console.error(err));

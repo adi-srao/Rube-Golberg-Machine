@@ -56,13 +56,13 @@ export default class CollisionSystem {
     worldBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
 
     // optional visualization
-    if (this.debugBounds) {
+    /*if (this.debugBounds) {
       if (!mesh.userData.boundsHelper) {
         mesh.userData.boundsHelper = new THREE.Box3Helper(worldBox);
         mesh.parent.add(mesh.userData.boundsHelper);
       }
       mesh.userData.boundsHelper.visible = true;
-    }
+    }*/
 
     return worldBox;
   }
@@ -81,7 +81,7 @@ export default class CollisionSystem {
 
     if (bobBox.intersectsBox(ball1Box)) {
       this._emit("PENDULUM_HIT_BALL1", { ball1 });
-      console.log("pendulum hit ball1");
+      //console.log("pendulum hit ball1");
     }
   }
 
@@ -98,7 +98,7 @@ export default class CollisionSystem {
 
     if (ball1Box.intersectsBox(rampBox)) {
       this._emit("BALL1_HIT_RAMP", { ball1 });
-      console.log("ball1 hit ramp");
+      //console.log("ball1 hit ramp");
     }
 
   }

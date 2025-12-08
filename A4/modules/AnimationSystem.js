@@ -44,7 +44,7 @@ export default class AnimationSystem {
     }
 
     ball.position.addScaledVector(ball.velocity, dt);
-    console.log("updated ball")
+    //console.log("updated ball")
   }
 
   _updatePendulum(dt,state) {

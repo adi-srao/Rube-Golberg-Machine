@@ -1,11 +1,11 @@
-// MainApp.js
+// MainApp.js (Updated with LightHandler integration)
 import * as THREE from "three";
 import SceneGraph from "./modules/SceneGraph.js";
 import MaterialFactory from "./modules/MaterialFactory.js";
 import { updateShaderUniforms } from "./modules/ShaderUniforms.js";
 import InputManager from "./modules/InputManager.js";
-import CameraManager from "./modules/CameraManager.js";
-import LightingManager from "./modules/LightingManager.js";
+import CameraManager from "./modules/CameraController.js";
+import LightHandler from "./modules/LightHandler.js";
 import AnimationSystem from "./modules/AnimationSystem.js";
 import CollisionSystem from "./modules/CollisionSystem.js";
 import RGMController from "./modules/RGMController.js";
@@ -31,18 +31,6 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 
-// light ------------------------------------------------------
-const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-scene.add(ambientLight);
-
-const mainLight = new THREE.PointLight(0xffffff, 1.0);
-mainLight.position.set(10, 20, 10);
-mainLight.castShadow = true;
-scene.add(mainLight);
-
-const lightHelper = new THREE.PointLightHelper(mainLight, 0.5);
-scene.add(lightHelper);
-
 // clock ------------------------------------------------------
 const clock = new THREE.Clock();
 
@@ -55,13 +43,13 @@ const shadingState = {
 let graphsGlobal = null;
 let inputManager = null;
 let cameraManager = null;
-let lightingManager = null;
+let lightHandler = null;
 let controller = null;
 let animationSystem = null;
 let collisionSystem = null;
+let rgmObjects = null;
 
 // rgmObjects builder
-
 function buildRGMObjects(graphs) {
   const rgm = {};
 
@@ -76,7 +64,7 @@ function buildRGMObjects(graphs) {
       gouraud: b1Gouraud,
       blinn:   b1Blinn,
     },
-    position: b1Phong.position.clone(),      // logical position
+    position: b1Phong.position.clone(),
     velocity: new THREE.Vector3(),
     radius: 0.3,
     active: true,
@@ -120,7 +108,7 @@ function buildRGMObjects(graphs) {
   const pendBlinn   = graphs.blinn.objects.pendulum;
 
   rgm.pendulum = {
-    length: 3,          // you used 3 in SceneGraph
+    length: 3,
     angle: 0,
     angularVelocity: 0,
     active: false,
@@ -134,9 +122,9 @@ function buildRGMObjects(graphs) {
       gouraud: pendGouraud.bob,
       blinn:   pendBlinn.bob,
     }
-  }
+  };
 
-    //ramp
+  // --- Ramp ---
   const rampPhong   = graphs.phong.objects.ramp;
   const rampGouraud = graphs.gouraud.objects.ramp;
   const rampBlinn   = graphs.blinn.objects.ramp;
@@ -152,11 +140,14 @@ function buildRGMObjects(graphs) {
   return rgm;
 }
 
-
 //----------------------------------------init------------------------------------------
 async function init() {
+  // Initialize LightHandler first
+  lightHandler = new LightHandler(scene);
 
-  const materialFactory = await MaterialFactory.create();
+  // Create MaterialFactory with LightHandler
+  const materialFactory = await MaterialFactory.create(lightHandler);
+  
   const sceneGraph = new SceneGraph(materialFactory);
   const graphs = sceneGraph.build(scene);
   graphsGlobal = graphs;
@@ -165,31 +156,31 @@ async function init() {
   console.log("[init] blinn root:", graphs.blinn?.root);
   console.log("[init] blinn objects:", graphs.blinn?.objects);
 
-
-  // initial visibility: blinn on, others off
-  shadingState.currentMode = "gouraud";
-  graphs.blinn.root.visible   = false;
+  // Initial visibility: blinn on, others off
+  shadingState.currentMode = "blinn";
+  graphs.blinn.root.visible   = true;
   graphs.phong.root.visible   = false;
-  graphs.gouraud.root.visible = true;
+  graphs.gouraud.root.visible = false;
 
   console.log("[init] initial mode:", shadingState.currentMode, {
     blinnVisible:   graphs.blinn.root.visible,
     phongVisible:   graphs.phong.root.visible,
     gouraudVisible: graphs.gouraud.root.visible,
-    });
+  });
 
-  const rgmObjects = buildRGMObjects(graphs);
+  rgmObjects = buildRGMObjects(graphs);
 
-  // systems
-  inputManager   = new InputManager(camera1, graphs, shadingState);
+  // Systems
+  inputManager   = new InputManager(camera1, graphs, shadingState, lightHandler);
   cameraManager  = new CameraManager(camera1);
-  lightingManager = new LightingManager(mainLight);
-  controller      = new RGMController(rgmObjects);
+  controller     = new RGMController(rgmObjects);
   animationSystem = new AnimationSystem(rgmObjects);
-  collisionSystem = new CollisionSystem(rgmObjects, { debugBounds: true }); // turn off later
+  collisionSystem = new CollisionSystem(rgmObjects, { debugBounds: true });
 
+  // Set up keyboard controls for lights
+  setupLightControls();
 
-  // resize handling
+  // Resize handling
   window.addEventListener("resize", () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -201,27 +192,118 @@ async function init() {
   animate();
 }
 
+function setupLightControls() {
+  // Keyboard controls for toggling lights
+  document.addEventListener('keydown', (e) => {
+    switch(e.key) {
+      case '1':
+        lightHandler.toggleLight('point');
+        break;
+      case '2':
+        lightHandler.toggleLight('directional');
+        break;
+      case '3':
+        lightHandler.toggleLight('tracking');
+        break;
+      case 'h':
+      case 'H':
+        // Toggle helpers visibility
+        const firstHelper = lightHandler.lightHelpers[0];
+        const currentlyVisible = firstHelper.helper.visible;
+        lightHandler.setHelpersVisible(!currentlyVisible);
+        console.log(`[LightHandler] Helpers: ${!currentlyVisible ? 'ON' : 'OFF'}`);
+        break;
+    }
+  });
+
+  console.log("[LightHandler] Controls:");
+  console.log("  1 - Toggle Point Light");
+  console.log("  2 - Toggle Directional Spotlight");
+  console.log("  3 - Toggle Tracking Spotlight");
+  console.log("  H - Toggle Light Helpers");
+}
+
 function animate() {
   requestAnimationFrame(animate);
 
   const dt = clock.getDelta();
 
-  // This is the "big picture" pipeline, currently mostly stubs:
-  // InputManager.update(dt);          // event-driven, so no-op
+  // Update input
   if (inputManager) inputManager.update(dt);
   
-  animationSystem.update(dt,controller.state);
-  //console.log("[animateed");
+  // Update animations and physics
+  animationSystem.update(dt, controller.state);
   collisionSystem.update(dt);
   controller.update(dt, collisionSystem.events);
 
-  if (lightingManager) lightingManager.update(dt);
-  if (cameraManager)   cameraManager.update(dt);
+  // Determine which object is currently active for tracking spotlight
+  updateTrackingTarget();
 
-  updateShaderUniforms(scene, camera1, mainLight);
+  // Update light positions and orientations
+  if (lightHandler) lightHandler.update(dt);
+
+  // Update camera
+  if (cameraManager) cameraManager.update(dt);
+
+  // Update all shader uniforms with current light state
+  updateShaderUniforms(scene, camera1, lightHandler);
 
   renderer.render(scene, camera1);
 }
 
-init().catch((err) => console.error(err));
+/**
+ * Updates the tracking spotlight target based on which object is currently moving
+ */
+function updateTrackingTarget() {
+  if (!lightHandler || !controller) return;
 
+  const state = controller.state;
+  
+  // Determine which object is active
+  if (state === 'BALL1_ROLLING' || state === 'BALL1_FALLING') {
+    // Track ball1
+    const mode = shadingState.currentMode;
+    const ball1Mesh = graphsGlobal[mode].objects.ball1;
+    if (ball1Mesh) {
+      lightHandler.setTrackingTarget(ball1Mesh.position);
+    }
+  } else if (state === 'DOMINOS_FALLING') {
+    const mode = shadingState.currentMode;
+    const dominos = rgmObjects.dominos;
+    const meshDominos    = graphsGlobal[mode].objects.dominos; 
+    if (dominos && dominos.length > 0) {
+      // Track falling domino using number of fallen dominos and set it to that domino's position
+       let lastFallenIndex = -1;
+        for (let i = 0; i < dominos.length; i++) {
+          if (dominos[i].fallen) {
+            lastFallenIndex = i;
+          }
+        }
+
+    if (lastFallenIndex >= 0) {
+        const targetMesh = meshDominos[lastFallenIndex];
+        lightHandler.setTrackingTarget(targetMesh.position);
+      }
+    }      
+    
+  } else if (state === 'PENDULUM_SWINGING') {
+    // Track pendulum bob
+    const mode = shadingState.currentMode;
+    const pendulum = graphsGlobal[mode].objects.pendulum;
+    if (pendulum && pendulum.bob) {
+      lightHandler.setTrackingTarget(pendulum.bob.position);
+    }
+  } else if (state === 'BALL2_ROLLING') {
+    // Track ball2
+    const mode = shadingState.currentMode;
+    const ball2Mesh = graphsGlobal[mode].objects.ball2;
+    if (ball2Mesh) {
+      lightHandler.setTrackingTarget(ball2Mesh.position);
+    }
+  } else {
+    // No active object, point at scene center
+    lightHandler.setTrackingTarget(new THREE.Vector3(0, 0, 0));
+  }
+}
+
+init().catch((err) => console.error(err));
