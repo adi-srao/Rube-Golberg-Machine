@@ -75,12 +75,13 @@ export default class SceneGraph {
   }
 
   _buildGround(parent, mode) {
-    const geo = new THREE.PlaneGeometry(50, 50);
+    const geo = new THREE.PlaneGeometry(11, 8);
     const mat = this.materialFactory.createGroundMaterial(mode);
 
     const ground = new THREE.Mesh(geo, mat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
+    ground.position.x = -1;
     ground.receiveShadow = true;
     ground.name = `groundPlane_${mode}`;
 
@@ -88,30 +89,23 @@ export default class SceneGraph {
   }
 
   _buildRing(parent, mode, objects) {
-    const baseGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.2, 32);
-    const baseMat = this.materialFactory.createRingBaseMaterial(mode);
-    const base = new THREE.Mesh(baseGeo, baseMat);
-    base.position.set(10, 0.1, 0);
-    base.receiveShadow = true;
-    parent.add(base);
 
     const hoopGeo = new THREE.TorusGeometry(1.2, 0.05, 16, 64);
     const hoopMat = this.materialFactory.createRingHoopMaterial(mode);
     const hoop = new THREE.Mesh(hoopGeo, hoopMat);
-    hoop.position.set(10, 0.3, 0);
+    hoop.position.set(7, -3, 0);
     hoop.rotation.x = Math.PI / 2;
     parent.add(hoop);
 
-    objects.ring.base = base;
     objects.ring.hoop = hoop;
   }
 
   _buildTrackAndBall1(parent, mode, objects) {
-    const rampGeo = new THREE.BoxGeometry(8, 0.3, 1);
+    const rampGeo = new THREE.BoxGeometry(7, 0.3, 1);
     const rampMat = this.materialFactory.createWoodTrackMaterial(mode);
     const ramp = new THREE.Mesh(rampGeo, rampMat);
-    ramp.position.set(-10, 1.5, 0);
-    ramp.rotation.z = -Math.PI / 10;
+    ramp.position.set(-11, 2.5, 0);
+    ramp.rotation.z =0
     ramp.castShadow = true;
     ramp.receiveShadow = true;
     parent.add(ramp);
@@ -119,7 +113,7 @@ export default class SceneGraph {
     const ballGeo = new THREE.SphereGeometry(0.3, 32, 32);
     const ballMat = this.materialFactory.createMetalBallMaterial(mode);
     const ball1 = new THREE.Mesh(ballGeo, ballMat);
-    ball1.position.set(-13, 2.0, 0);
+    ball1.position.set(-13.88, 3, 0);
     ball1.castShadow = true;
     parent.add(ball1);
 
@@ -153,7 +147,7 @@ export default class SceneGraph {
     parent.add(pendulumRoot);
 
     const pivot = new THREE.Object3D();
-    pivot.position.set(2, 4, 0); // height above ground
+    pivot.position.set(-14.7, 6.2, 0); // height above ground
     pivot.name = `pendulumPivot_${mode}`;
     pendulumRoot.add(pivot);
 
@@ -182,7 +176,7 @@ export default class SceneGraph {
     const ballGeo = new THREE.SphereGeometry(0.35, 32, 32);
     const ballMat = this.materialFactory.createMetalBallMaterial(mode);
     const ball2 = new THREE.Mesh(ballGeo, ballMat);
-    ball2.position.set(6, 2.0, 0);
+    ball2.position.set(3.4, 0.35, 0);
     ball2.castShadow = true;
     parent.add(ball2);
 
