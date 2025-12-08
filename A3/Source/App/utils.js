@@ -142,7 +142,7 @@ async function MeshFactory(scene, objPath, mtlPath, texturePath, name, vShaderPa
         
         // Extract material properties from MTL file
         const baseColour = (srcMat && srcMat.color) ? srcMat.color.clone() : new THREE.Color(0xffffff);
-        const ambientColor = new THREE.Color(0.5, 0.5, 0.5); // Brighter ambient light
+        const ambientColor = new THREE.Color(1,1,1); // Brighter ambient light
         const specularColor = (srcMat && srcMat.specular) ? srcMat.specular.clone() : new THREE.Color(0.3, 0.3, 0.3);
         const emissionColor = (srcMat && srcMat.emissive) ? srcMat.emissive.clone() : new THREE.Color(0.0, 0.0, 0.0);
         const shininess = (srcMat && srcMat.shininess !== undefined) ? srcMat.shininess : 30.0;
@@ -168,12 +168,17 @@ async function MeshFactory(scene, objPath, mtlPath, texturePath, name, vShaderPa
                 u_useMap: { value: baseMap ? 1.0 : 0.0 }
             };
             
+            const hasUVs = geom.attributes.uv !== undefined;
+            console.log('MeshFactory: geometry has UVs:', hasUVs);
+
             runtimeMat = new THREE.ShaderMaterial({
                 vertexShader: vShader,
                 fragmentShader: fShader,
                 uniforms,
                 transparent,
-                side: (srcMat && srcMat.side) || THREE.FrontSide
+                side: (srcMat && srcMat.side) || THREE.FrontSide,
+                defines: hasUVs ? { USE_UV: '' } : {}
+
             });
         } else {
             console.log('MeshFactory: creating fallback MeshStandardMaterial for', child.name);
@@ -260,8 +265,8 @@ MeshFactory(
     '../../Models/Monkey.mtl',
     '../../Textures/1.jpg',
     'Monkey',
-    '../Shaders/Blinn_Phong/vertex_shader.glsl',
-    '../Shaders/Blinn_Phong/fragment_shader.glsl'
+    '../Shaders/Gouraud/vertex_shader.glsl',
+    '../Shaders/Gouraud/fragment_shader.glsl'
 ).then(() => {
     // Debug: log scene contents AFTER mesh is added
     console.log('animate: scene children', scene.children);

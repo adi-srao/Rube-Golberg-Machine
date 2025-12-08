@@ -1,20 +1,33 @@
 precision mediump float;
 
-attribute vec3 a_position;
-attribute vec3 a_normal;
+// Three.js built-in attributes
+// attribute vec3 position;  // automatically provided
+// attribute vec3 normal;    // automatically provided
 
-uniform mat4 u_model;
-uniform mat4 u_viewProjection;
+// Three.js built-in uniforms
+// uniform mat4 modelMatrix;
+// uniform mat4 viewMatrix;
+// uniform mat4 projectionMatrix;
+// uniform mat4 modelViewMatrix;
+// uniform mat3 normalMatrix;
 
 varying vec3 v_normal;
 varying vec3 v_position;
+varying vec2 v_uv;
 
 void main() {
-    vec4 worldPosition = u_model * vec4(a_position, 1.0);
+    // Transform position to world space
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
     v_position = worldPosition.xyz;
     
-    mat3 normalMatrix = mat3(u_model);
-    v_normal = normalize(normalMatrix * a_normal);
+    // Transform normal to world space using normalMatrix
+    v_normal = normalize(normalMatrix * normal);
     
-    gl_Position = u_viewProjection * worldPosition;
+    // Pass UV coordinates if available
+    #ifdef USE_UV
+        v_uv = uv;
+    #endif
+    
+    // Use Three.js built-in matrices for final position
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
