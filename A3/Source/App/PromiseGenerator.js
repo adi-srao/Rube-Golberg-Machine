@@ -6,7 +6,9 @@ const objLoader = new OBJLoader();
 const mtlLoader = new MTLLoader();
 const textureLoader = new THREE.TextureLoader();
 
-export async function fetchText(path) {
+// Prototype to get text from a source
+export async function fetchText(path) 
+{
     if (!path) return null;
     try {
         const res = await fetch(path);
@@ -18,36 +20,52 @@ export async function fetchText(path) {
     }
 }
 
-export function fetchTexture(path) {
+// Prototype to get the texture image from a source
+export function fetchTexture(path) 
+{
     if (!path) return Promise.resolve(null);
-    return new Promise((resolve) => {
-        textureLoader.load(path, (tex) => {
+    return new Promise((resolve) => 
+    {
+        textureLoader.load(path, (tex) => 
+        {
             try { tex.colorSpace = THREE.SRGBColorSpace; } catch(e) {}
             resolve(tex);
-        }, undefined, (e) => {
+        }, 
+        undefined, (e) => 
+        {
             console.warn('Texture load error:', path, e);
             resolve(null);
         });
     });
 }
 
-export function fetchMaterial(path) {
+// Prototype to get information from a .mtl file
+export function fetchMaterial(path) 
+{
     if (!path) return Promise.resolve(null);
-    return new Promise((resolve) => {
-        mtlLoader.load(path, (materials) => {
+
+    return new Promise((resolve) => 
+    {
+        mtlLoader.load(path, (materials) => 
+        {
             materials.preload();
             resolve(materials);
-        }, undefined, (e) => {
+        }, 
+        undefined, (e) => 
+        {
             console.warn('MTL load error:', path, e);
             resolve(null);
         });
     });
 }
 
-export function fetchObject(path, materials) {
+// Prototype to get geometry from a .obj file
+export function fetchObject(path, materials) 
+{
     if (!path) return Promise.resolve(null);
     if (materials) objLoader.setMaterials(materials);
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => 
+    {
         objLoader.load(path, resolve, undefined, reject);
     });
 }

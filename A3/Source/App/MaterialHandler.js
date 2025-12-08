@@ -1,11 +1,9 @@
 import * as THREE from 'three';
 
-// Helper to create empty placeholder arrays with UNIQUE instances
-function getEmptyLightUniforms() {
-    const MAX = { DIR: 4, POINT: 8, SPOT: 4, HEMI: 2 };
-    
-    // BAD: new Array(4).fill(new Vector3()) -> All 4 share the same memory!
-    // GOOD: Array.from({ length: 4 }, () => new Vector3()) -> 4 unique vectors.
+// Used to generate empty light uniform structures for dynamic light manipulation
+function getEmptyLightUniforms() 
+{
+    const MAX = { DIR: 4, POINT: 4, SPOT: 4, HEMI: 2 };
     
     const padVec3 = (count) => Array.from({ length: count }, () => new THREE.Vector3());
     const padCol = (count) => Array.from({ length: count }, () => new THREE.Color(0, 0, 0));
@@ -22,7 +20,7 @@ function getEmptyLightUniforms() {
         u_pointLightPositions: { value: padVec3(MAX.POINT) },
         u_pointLightColors: { value: padCol(MAX.POINT) },
         u_pointLightIntensities: { value: padFloat(MAX.POINT) },
-        u_pointLightDecays: { value: padFloat(MAX.POINT) }, // Fill with 2.0 ideally, but 0 is safe for init
+        u_pointLightDecays: { value: padFloat(MAX.POINT) },
         u_numPointLights: { value: 0 },
 
         // Spot
@@ -43,7 +41,9 @@ function getEmptyLightUniforms() {
     };
 }
 
-export function extractMaterialProps(srcMat) {
+// Function to get material parameteres from a THREE.Material
+export function extractMaterialProps(srcMat) 
+{
     return {
         baseColour: (srcMat && srcMat.color) ? srcMat.color.clone() : new THREE.Color(0xffffff),
         ambientColor: new THREE.Color(0.2, 0.2, 0.2),
@@ -56,7 +56,9 @@ export function extractMaterialProps(srcMat) {
     };
 }
 
-export function createShaderMaterial(vShader, fShader, props, defaultTexture, hasUVs) {
+// Function to create a ShaderMaterial with lighting uniforms
+export function createShaderMaterial(vShader, fShader, props, defaultTexture, hasUVs) 
+{
     const transparent = props.opacity < 1;
     const baseMap = props.map || defaultTexture;
 
@@ -71,6 +73,7 @@ export function createShaderMaterial(vShader, fShader, props, defaultTexture, ha
     };
 
     // Merge basic props with the initialized empty light structures
+    // This allows integration of dynamic lighting into the shader material
     const uniforms = {
         ...basicUniforms,
         ...getEmptyLightUniforms() 
