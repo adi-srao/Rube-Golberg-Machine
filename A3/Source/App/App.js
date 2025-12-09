@@ -17,6 +17,8 @@ const { scene, camera, renderer, controls } = initScene('gl-canvas');
 const { lights, lightHelpers } = setupLights(scene);
 
 // Updating all shader materials with current light states 
+// Updating all shader materials with current light states 
+// Updating all shader materials with current light states 
 function updateAllMeshUniforms() 
 {
     const lightUniforms = getLightUniforms(lights);
@@ -32,9 +34,33 @@ function updateAllMeshUniforms()
                 
                 const uniforms = child.material.uniforms;
 
+                // Update each uniform by copying the array elements
                 Object.keys(lightUniforms).forEach((key) => {
-                    if (uniforms[key])
-                        uniforms[key].value = lightUniforms[key];
+                    if (uniforms[key]) {
+                        const newValue = lightUniforms[key];
+                        
+                        // For array uniforms, copy each element
+                        if (Array.isArray(newValue) && Array.isArray(uniforms[key].value)) {
+                            for (let i = 0; i < newValue.length && i < uniforms[key].value.length; i++) {
+                                
+                                // SAFETY CHECK: Ensure newValue[i] is defined before using it
+                                if (newValue[i] !== undefined) {
+                                    if (newValue[i] && typeof newValue[i].copy === 'function') {
+                                        // For Vector3 and Color objects
+                                        if (uniforms[key].value[i] && typeof uniforms[key].value[i].copy === 'function') {
+                                            uniforms[key].value[i].copy(newValue[i]);
+                                        }
+                                    } else {
+                                        // For primitive values (numbers)
+                                        uniforms[key].value[i] = newValue[i];
+                                    }
+                                }
+                            }
+                        } else {
+                            // For non-array uniforms (like counts)
+                            uniforms[key].value = newValue;
+                        }
+                    }
                 });
                 
                 child.material.uniformsNeedUpdate = true;
@@ -78,10 +104,10 @@ async function updateShadingModel(newModel)
 
     const config = 
     {
-        objPath: '../../Models/Sphere.obj',
-        mtlPath: '../../Models/Sphere.mtl',
+        objPath: '../../Models/Monkey.obj',
+        mtlPath: '../../Models/Monkey.mtl',
         texturePath: '../../Textures/2.jpg',
-        name: `Sphere_${newModel}`,
+        name: `Monkey_${newModel}`,
         vShaderPath: vPath,
         fShaderPath: fPath
     };

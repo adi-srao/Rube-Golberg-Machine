@@ -2,11 +2,9 @@ import * as THREE from 'three';
 
 export function setupLights(scene) 
 {
+    // ... (This function remains unchanged)
     const lights = [];
     const lightHelpers = [];
-
-    // Add lights of all types to scene, along with objects to visualize them (colour and position)
-    // Up to 4 of each type can be handled in the shader
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 6);
     dirLight.position.set(0, -10, 10);
@@ -34,7 +32,6 @@ export function setupLights(scene)
     scene.add(hemiLight);
     lights.push(hemiLight);
     
-    // Hemisphere visualiser uses 2 hemispheres of the sky and ground colour to visualise
     const top = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({ color: 0x8888ff }));
     const bot = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({ color: 0x442200 }));
     top.position.set(0, 3, 0); bot.position.set(0, 3, 0);
@@ -46,6 +43,7 @@ export function setupLights(scene)
 
 function addHelper(scene, light, list, color, type='default') 
 {
+    // ... (This function remains unchanged)
     let mesh;
     if (type === 'sphere')
         mesh = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({ color }));
@@ -60,7 +58,6 @@ function addHelper(scene, light, list, color, type='default')
     list.push({ helper: mesh, light });
 }
 
-// Function to traverse lights and generate uniforms for shaders
 export function getLightUniforms(lights) 
 {
     const MAX = { DIR: 4, POINT: 4, SPOT: 4, HEMI: 2 };
@@ -77,12 +74,20 @@ export function getLightUniforms(lights)
         else if (l.isHemisphereLight) data.hemi.push({ l, intensity: effectiveIntensity });
     });
 
-    // Generating padded arrays for each light type
+    // Helper objects for padding
     const zeros = { vec3: new THREE.Vector3(), color: new THREE.Color(0,0,0), float: 0.0 };
 
+    // Ensures we clone objects so each uniform slot is unique
+    // Handles primitives (numbers) correctly
     const pad = (arr, max, filler) => {
         const res = [...arr];
-        while (res.length < max) res.push(filler);
+        while (res.length < max) {
+            if (filler && typeof filler.clone === 'function') {
+                res.push(filler.clone());
+            } else {
+                res.push(filler);
+            }
+        }
         return res;
     };
 

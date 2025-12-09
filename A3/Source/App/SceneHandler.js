@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 
-export function initScene(canvasId) 
-{
+export function initScene(canvasId) {
     const canvas = document.getElementById(canvasId);
     const width = canvas.clientWidth || canvas.width;
     const height = canvas.clientHeight || canvas.height;
@@ -19,6 +18,7 @@ export function initScene(canvasId)
     renderer.setSize(width, height, false);
 
     const controls = new TrackballControls(camera, renderer.domElement);
+    // Config controls
     controls.rotateSpeed = 5.0;
     controls.zoomSpeed = 2.0;
     controls.dynamicDampingFactor = 0.3;
