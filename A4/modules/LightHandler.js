@@ -18,7 +18,7 @@ export default class LightHandler {
 
   _initializeLights() {
     // 1. Fixed Point Light - illuminates entire scene
-    this.pointLight = new THREE.PointLight(0xffffff, 0.4, 0, 2);
+    this.pointLight = new THREE.PointLight(0xffffff, 0.75, 0, 2);
     this.pointLight.position.set(0, 15, 10);
     this.pointLight.visible = true;
     this.scene.add(this.pointLight);

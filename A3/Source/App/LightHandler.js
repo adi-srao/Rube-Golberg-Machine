@@ -7,7 +7,7 @@ export function setupLights(scene)
     const lightHelpers = [];
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 6);
-    dirLight.position.set(0, -10, 10);
+    dirLight.position.set(0, -5, 5);
     dirLight.target.position.set(0, 0, 0);
     scene.add(dirLight);
     scene.add(dirLight.target);
@@ -15,20 +15,20 @@ export function setupLights(scene)
     addHelper(scene, dirLight, lightHelpers, 0xfffff);
 
     const pointLight = new THREE.PointLight(0xffaa88, 6, 0, 2);
-    pointLight.position.set(-10, 10, -10);
+    pointLight.position.set(-5, 5, -5);
     scene.add(pointLight);
     lights.push(pointLight);
     addHelper(scene, pointLight, lightHelpers, 0xffaa88, 'sphere');
 
-    const spotLight = new THREE.SpotLight(0x88aaff, 6, 100, Math.PI / 6, 0.3, 2);
-    spotLight.position.set(10, 10, -10);
+    const spotLight = new THREE.SpotLight(0x88aaff, 6, 50, Math.PI / 6, 0.3, 2);
+    spotLight.position.set(5, 5, -5);
     spotLight.target.position.set(0, 0, 0);
     scene.add(spotLight);
     scene.add(spotLight.target);
     lights.push(spotLight);
     addHelper(scene, spotLight, lightHelpers, 0x88aaff);
 
-    const hemiLight = new THREE.HemisphereLight(0x8888ff, 0x442200, 1.5);
+    const hemiLight = new THREE.HemisphereLight('cyan', 'red', 1);
     scene.add(hemiLight);
     lights.push(hemiLight);
     
